@@ -1,6 +1,7 @@
 import os
 
 import argostranslate.package
+import argostranslate.translate
 
 
 DEFAULT_PAIRS = "ja:en,en:ja,en:tl,tl:en"
@@ -12,11 +13,13 @@ def main() -> None:
 
     argostranslate.package.update_package_index()
     available = argostranslate.package.get_available_packages()
-    installed = {
-        (language.code, target.code)
-        for language in argostranslate.translate.get_installed_languages()
-        for target in language.translations_from
-    }
+    installed = set()
+    for language in argostranslate.translate.get_installed_languages():
+        for translation in language.translations_from:
+            from_language = getattr(translation, "from_lang", None)
+            to_language = getattr(translation, "to_lang", None)
+            if from_language and to_language:
+                installed.add((from_language.code, to_language.code))
 
     for from_code, to_code in sorted(pairs):
         if (from_code, to_code) in installed:
