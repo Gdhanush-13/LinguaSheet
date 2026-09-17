@@ -14,6 +14,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         os.getenv("FRONTEND_ORIGIN", "https://lingua-sheet.vercel.app"),
     ],
+    allow_origin_regex=r"https://lingua-sheet(?:-[a-z0-9-]+)?\.vercel\.app",
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )

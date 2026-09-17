@@ -48,13 +48,26 @@ function save(blob: Blob, name: string) {
 }
 async function translate(pages: PdfPage[], source: Lang, target: Lang) {
   if (source.code === target.code) return pages;
-  const url =
-    import.meta.env.VITE_TRANSLATION_API_URL || "http://localhost:8000";
-  const r = await fetch(`${url}/translate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pages, source: source.code, target: target.code }),
-  });
+  if (!pages.some((page) => page.text.trim())) {
+    throw new Error(
+      "This PDF has no text layer. Scanned PDFs need OCR before translation.",
+    );
+  }
+  const url = (
+    import.meta.env.VITE_TRANSLATION_API_URL || "http://localhost:8000"
+  ).replace(/\/+$/, "");
+  let r: Response;
+  try {
+    r = await fetch(`${url}/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages, source: source.code, target: target.code }),
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the translation service. It may be waking up; please try again in a few seconds.",
+    );
+  }
   if (!r.ok)
     throw new Error(
       (await r.json().catch(() => ({}))).detail ||
