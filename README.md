@@ -1,3 +1,9 @@
+---
+title: LinguaSheet Translation API
+sdk: docker
+app_port: 7860
+---
+
 # LinguaSheet
 
 Translate PDF text and export it to Excel.
@@ -62,7 +68,9 @@ Import this repository as a Vite project using the repository root. Add this pro
 VITE_TRANSLATION_API_URL=https://linguasheet-translation.onrender.com
 ```
 
-### Render backend
+### Hugging Face Docker backend
+
+The `Dockerfile` installs the backend dependencies and downloads only the priority Japanese-to-English and Tagalog-to-English Argos model packages during image build. Models are stored in `/app/argos-packages` and loaded only by the self-hosted API. The PDF remains in the browser; the backend receives extracted page text and does not write temporary PDF files.
 
 The included `render.yaml` installs `backend_requirements.txt`, installs the priority Japanese→English and Filipino/Tagalog→English Argos model pairs, starts `backend_main.py`, and checks `/health`. Override the model list with `ARGOS_PAIRS` using comma-separated pairs such as `ja:en,tl:en`.
 
