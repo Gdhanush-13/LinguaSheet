@@ -1,5 +1,12 @@
 import os
 
+# Keep downloaded models inside Render's built application directory so the
+# same packages are available when the runtime process starts.
+os.environ.setdefault(
+    "ARGOS_PACKAGES_DIR",
+    os.path.join(os.path.dirname(__file__), ".argos-packages"),
+)
+
 import argostranslate.package
 import argostranslate.translate
 
