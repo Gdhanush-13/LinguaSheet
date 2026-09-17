@@ -5,6 +5,7 @@ import "./styles.css";
 type Lang = { code: string; name: string };
 const langs: Lang[] = [
   ["en", "English"],
+  ["tl", "Filipino"],
   ["ja", "Japanese"],
   ["es", "Spanish"],
   ["fr", "French"],
@@ -251,8 +252,9 @@ function App() {
             </div>
             <p className="note">
               Local/self-hosted translation keeps the API key out of the
-              browser. URLs, IDs, emails, phone numbers, and numeric values are
-              preserved.
+              browser. The Translate button processes every page; the page list
+              only changes the preview. URLs, IDs, emails, phone numbers, and
+              numeric values are preserved.
             </p>
             {error && <div className="error">{error}</div>}
             {pages.length > 0 && (

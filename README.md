@@ -20,7 +20,8 @@ The Vercel project uses `VITE_TRANSLATION_API_URL` to connect to Render. Render 
 - PDF upload with PDF-only and 25 MB validation
 - Browser-side text extraction with page preview
 - Source-language detection with manual source-language selection
-- English, Japanese, Spanish, French, German, Portuguese, Hindi, Telugu, Tamil, Arabic, Chinese, Korean, Russian, Italian, Dutch, Turkish, Vietnamese, and Thai choices
+- English, Filipino, Japanese, Spanish, French, German, Portuguese, Hindi, Telugu, Tamil, Arabic, Chinese, Korean, Russian, Italian, Dutch, Turkish, Vietnamese, and Thai choices
+- Full-document translation: the page list is for preview navigation only; translation and Excel export include every extracted page
 - Direct PDF-to-Excel export without translation
 - Page, original, and translated Excel columns with wrapping, filters, and frozen headers
 - Preservation of URLs, email addresses, phone numbers, IDs, codes, and numeric references during translation
@@ -49,7 +50,7 @@ For local frontend-to-backend translation, create `.env.local` from `.env.exampl
 VITE_TRANSLATION_API_URL=http://localhost:8000
 ```
 
-Install the Argos language model packages for each language pair you need. They are not bundled because they are large and pair-specific.
+Install the Argos language model packages for each language pair you need. They are not bundled because they are large and pair-specific. Filipino uses Argos code `tl` (Tagalog); install the English↔Tagalog packages for English/Filipino translation.
 
 ## Deploy
 

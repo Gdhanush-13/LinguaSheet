@@ -3,8 +3,18 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import ExcelJS from "exceljs";
 GlobalWorkerOptions.workerSrc = workerUrl;
 export type PdfPage = { page: number; text: string };
+
+const pdfOptions = {
+  cMapUrl: "/cmaps/",
+  cMapPacked: true,
+  standardFontDataUrl: "/standard_fonts/",
+};
+
 export async function extractPdf(file: File) {
-  const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
+  const pdf = await getDocument({
+    data: await file.arrayBuffer(),
+    ...pdfOptions,
+  }).promise;
   const pages: PdfPage[] = [];
   try {
     for (let n = 1; n <= pdf.numPages; n++) {
