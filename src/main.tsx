@@ -5,7 +5,7 @@ import "./styles.css";
 type Lang = { code: string; name: string };
 const langs: Lang[] = [
   ["en", "English"],
-  ["tl", "Filipino"],
+  ["tl", "Filipino (Tagalog)"],
   ["ja", "Japanese"],
   ["es", "Spanish"],
   ["fr", "French"],

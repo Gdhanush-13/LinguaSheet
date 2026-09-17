@@ -4,7 +4,9 @@ import argostranslate.package
 import argostranslate.translate
 
 
-DEFAULT_PAIRS = "ja:en,en:ja,en:tl,tl:en"
+# Keep the Render free instance focused on the two priority inbound workflows.
+# Additional language pairs can be enabled later with ARGOS_PAIRS.
+DEFAULT_PAIRS = "ja:en,tl:en"
 
 
 def main() -> None:
