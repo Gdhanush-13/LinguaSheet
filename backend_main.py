@@ -57,7 +57,13 @@ def restore(text: str, tokens: list[str]) -> str:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "engine": "Argos Translate", "provider": "self-hosted"}
+    languages = [language.code for language in argostranslate.translate.get_installed_languages()]
+    return {
+        "status": "ok",
+        "engine": "Argos Translate",
+        "provider": "self-hosted",
+        "installed_languages": languages,
+    }
 
 
 @app.post("/translate")
