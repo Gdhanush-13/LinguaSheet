@@ -1,4 +1,5 @@
 import re
+import os
 
 import argostranslate.translate
 from fastapi import FastAPI, HTTPException
@@ -8,7 +9,11 @@ from pydantic import BaseModel
 app = FastAPI(title="LinguaSheet self-hosted translation")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        os.getenv("FRONTEND_ORIGIN", "https://linguasheet.vercel.app"),
+    ],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )

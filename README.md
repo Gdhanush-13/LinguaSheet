@@ -35,7 +35,7 @@ Install the Argos language packages for each pair you need. Argos model packages
 
 ## Deployment
 
-Deploy the frontend as its own Vercel project. Deploy `backend_main.py` to a Python host such as Render, Railway, or Fly.io, install `backend_requirements.txt`, install the required Argos model packages, allow the Vercel origin in CORS, and set `VITE_TRANSLATION_API_URL` to that backend. Vercel serverless functions are not suitable for bundling all Argos models and Japanese OCR dependencies.
+Deploy the frontend as its own Vercel project. The included `render.yaml` deploys `backend_main.py` as a Render web service. Set `FRONTEND_ORIGIN` to the Vercel URL, install the required Argos model packages on the service, and set `VITE_TRANSLATION_API_URL` to the Render URL. Vercel serverless functions are not suitable for bundling all Argos models and Japanese OCR dependencies.
 
 ## Known limitations
 
