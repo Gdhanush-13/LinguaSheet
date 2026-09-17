@@ -1,5 +1,6 @@
 import re
 import os
+import logging
 
 import argostranslate.translate
 from fastapi import FastAPI, HTTPException
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI(title="LinguaSheet self-hosted translation")
+logger = logging.getLogger("linguasheet")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -83,7 +85,8 @@ def translate(request: TranslationRequest):
             output.append({"page": page.page, "text": restore(translated, tokens)})
         return {"pages": output}
     except Exception as exc:
+        logger.exception("Translation failed for %s->%s", request.source, request.target)
         raise HTTPException(
             503,
-            "No Argos package is installed for this language pair.",
+            f"Translation failed for {request.source}->{request.target}: {exc}",
         ) from exc
