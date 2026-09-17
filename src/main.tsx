@@ -35,9 +35,14 @@ const script: Record<string, RegExp> = {
   th: /[\u0e00-\u0e7f]/,
   ru: /[\u0400-\u04ff]/,
 };
+const tagalogHints = /\b(ang|ng|mga|ito|iyon|ako|ikaw|kami|kayo|sila|ay|at|sa|para|mula|may|pag|hindi|kung|isang|pagsubok|kumusta)\b/gi;
 function detect(text: string) {
   const hit = Object.entries(script).find(([, re]) => re.test(text));
-  return langs.find((x) => x.code === hit?.[0]) ?? langs[0];
+  if (hit) return langs.find((x) => x.code === hit[0]) ?? langs[0];
+  const tagalogMatches = text.match(tagalogHints)?.length ?? 0;
+  return tagalogMatches >= 2
+    ? langs.find((x) => x.code === "tl") ?? langs[0]
+    : langs.find((x) => x.code === "en") ?? langs[0];
 }
 function save(blob: Blob, name: string) {
   const u = URL.createObjectURL(blob),
@@ -55,7 +60,8 @@ async function translate(pages: PdfPage[], source: Lang, target: Lang) {
     );
   }
   const url = (
-    import.meta.env.VITE_TRANSLATION_API_URL || "http://localhost:8000"
+    import.meta.env.VITE_TRANSLATION_API_URL ||
+    "https://linguasheet-translation.onrender.com"
   ).replace(/\/+$/, "");
   let r: Response;
   try {
@@ -82,7 +88,9 @@ function App() {
   const [pages, setPages] = useState<PdfPage[]>([]);
   const [translated, setTranslated] = useState<PdfPage[]>([]);
   const [source, setSource] = useState(langs[0]);
-  const [target, setTarget] = useState(langs[1]);
+  const [target, setTarget] = useState(
+    langs.find((x) => x.code === "en") ?? langs[0],
+  );
   const [active, setActive] = useState(1);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
