@@ -2,7 +2,19 @@ import re
 import os
 import logging
 
+# Render mounts the persistent Argos disk at runtime. Keep a local fallback so
+# the backend still runs during local development.
+os.environ.setdefault(
+    "ARGOS_PACKAGES_DIR",
+    os.path.join(os.path.dirname(__file__), "argos-packages"),
+)
+os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
+os.environ.setdefault("ARGOS_INTER_THREADS", "1")
+os.environ.setdefault("ARGOS_INTRA_THREADS", "1")
+os.environ.setdefault("ARGOS_BATCH_SIZE", "8")
+
 import argostranslate.translate
+import argostranslate.package
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -59,12 +71,22 @@ def restore(text: str, tokens: list[str]) -> str:
 
 @app.get("/health")
 def health():
-    languages = [language.code for language in argostranslate.translate.get_installed_languages()]
+    languages = [
+        language.code
+        for language in argostranslate.translate.get_installed_languages()
+    ]
+    pairs = [
+        f"{package.from_code}->{package.to_code}"
+        for package in argostranslate.package.get_installed_packages()
+        if package.type == "translate"
+    ]
     return {
         "status": "ok",
         "engine": "Argos Translate",
         "provider": "self-hosted",
         "installed_languages": languages,
+        "installed_pairs": sorted(set(pairs)),
+        "packages_dir": os.environ["ARGOS_PACKAGES_DIR"],
     }
 
 
@@ -74,14 +96,19 @@ def translate(request: TranslationRequest):
         return {"pages": request.pages}
 
     try:
+        translation = argostranslate.translate.get_translation_from_codes(
+            request.source,
+            request.target,
+        )
+        if translation is None:
+            raise RuntimeError(
+                f"Argos model is not installed for {request.source}->{request.target}"
+            )
+
         output = []
         for page in request.pages:
             safe_text, tokens = protect(page.text)
-            translated = argostranslate.translate.translate(
-                safe_text,
-                request.source,
-                request.target,
-            )
+            translated = translation.translate(safe_text)
             output.append({"page": page.page, "text": restore(translated, tokens)})
         return {"pages": output}
     except Exception as exc:

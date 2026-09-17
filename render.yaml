@@ -2,12 +2,24 @@ services:
   - type: web
     name: linguasheet-translation
     runtime: python
-    plan: free
-    buildCommand: pip install -r backend_requirements.txt && python install_argos_models.py
-    startCommand: python -m uvicorn backend_main:app --host 0.0.0.0 --port $PORT
+    plan: standard
+    buildCommand: pip install -r backend_requirements.txt
+    startCommand: python install_argos_models.py && python -m uvicorn backend_main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: FRONTEND_ORIGIN
         sync: false
       - key: ARGOS_PACKAGES_DIR
-        value: /opt/render/project/src/argos-packages
+        value: /var/data/argos-packages
+      - key: ARGOS_DEVICE_TYPE
+        value: cpu
+      - key: ARGOS_INTER_THREADS
+        value: "1"
+      - key: ARGOS_INTRA_THREADS
+        value: "1"
+      - key: ARGOS_BATCH_SIZE
+        value: "8"
+    disk:
+      name: argos-models
+      mountPath: /var/data
+      sizeGB: 10

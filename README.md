@@ -68,9 +68,18 @@ Import this repository as a Vite project using the repository root. Add this pro
 VITE_TRANSLATION_API_URL=https://linguasheet-translation.onrender.com
 ```
 
-### Hugging Face Docker backend
+### Persistent Render backend
 
-The `Dockerfile` installs the backend dependencies and downloads only the priority Japanese-to-English and Tagalog-to-English Argos model packages during image build. Models are stored in `/app/argos-packages` and loaded only by the self-hosted API. The PDF remains in the browser; the backend receives extracted page text and does not write temporary PDF files.
+The included `render.yaml` uses Render's paid Standard plan (1 CPU and 2 GB
+RAM) with a 10 GB persistent disk mounted at `/var/data`. On the first start,
+the service downloads and installs only the priority Japanese-to-English and
+Tagalog-to-English Argos packages into `/var/data/argos-packages`. Later
+restarts reuse those packages. Override the model list with `ARGOS_PAIRS` using
+comma-separated pairs such as `ja:en,tl:en`.
+
+The PDF remains in the browser. The backend receives only extracted page text
+for translation and does not receive or store the uploaded PDF file. No public
+translation API is used.
 
 The included `render.yaml` installs `backend_requirements.txt`, installs the priority Japanese→English and Filipino/Tagalog→English Argos model pairs, starts `backend_main.py`, and checks `/health`. Override the model list with `ARGOS_PAIRS` using comma-separated pairs such as `ja:en,tl:en`.
 
@@ -80,7 +89,9 @@ Set this Render environment variable to the deployed Vercel origin:
 FRONTEND_ORIGIN=https://lingua-sheet.vercel.app
 ```
 
-The Render free instance can sleep after inactivity, so the first request may take longer while it wakes up.
+The service must remain on a paid plan because Render persistent disks are not
+available to Free web services. The first startup after the disk is attached
+may take several minutes while the two Argos packages download.
 
 ## API
 

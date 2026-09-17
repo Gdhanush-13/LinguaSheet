@@ -1,11 +1,16 @@
 import os
 
-# Keep downloaded models inside Render's built application directory so the
-# same packages are available when the runtime process starts.
+# The Render persistent disk is mounted only when the service runs. The start
+# command invokes this script, so models are installed once and survive
+# restarts and redeploys.
 os.environ.setdefault(
     "ARGOS_PACKAGES_DIR",
-    os.path.join(os.path.dirname(__file__), "argos-packages"),
+    "/var/data/argos-packages",
 )
+os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
+os.environ.setdefault("ARGOS_INTER_THREADS", "1")
+os.environ.setdefault("ARGOS_INTRA_THREADS", "1")
+os.environ.setdefault("ARGOS_BATCH_SIZE", "8")
 
 import argostranslate.package
 import argostranslate.translate
@@ -22,13 +27,11 @@ def main() -> None:
 
     argostranslate.package.update_package_index()
     available = argostranslate.package.get_available_packages()
-    installed = set()
-    for language in argostranslate.translate.get_installed_languages():
-        for translation in language.translations_from:
-            from_language = getattr(translation, "from_lang", None)
-            to_language = getattr(translation, "to_lang", None)
-            if from_language and to_language:
-                installed.add((from_language.code, to_language.code))
+    installed = {
+        (package.from_code, package.to_code)
+        for package in argostranslate.package.get_installed_packages()
+        if package.type == "translate"
+    }
 
     for from_code, to_code in sorted(pairs):
         if (from_code, to_code) in installed:
@@ -48,6 +51,17 @@ def main() -> None:
 
         print(f"Installing Argos model: {from_code}->{to_code}")
         argostranslate.package.install_from_path(package.download())
+
+    argostranslate.translate.get_installed_languages.cache_clear()
+    final_pairs = {
+        (package.from_code, package.to_code)
+        for package in argostranslate.package.get_installed_packages()
+        if package.type == "translate"
+    }
+    print(
+        "Installed Argos pairs: "
+        + ", ".join(f"{source}->{target}" for source, target in sorted(final_pairs))
+    )
 
 
 if __name__ == "__main__":
