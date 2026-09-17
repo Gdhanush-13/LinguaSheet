@@ -4,7 +4,7 @@ import os
 # same packages are available when the runtime process starts.
 os.environ.setdefault(
     "ARGOS_PACKAGES_DIR",
-    os.path.join(os.path.dirname(__file__), ".argos-packages"),
+    os.path.join(os.path.dirname(__file__), "argos-packages"),
 )
 
 import argostranslate.package

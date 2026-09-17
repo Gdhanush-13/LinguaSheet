@@ -10,4 +10,4 @@ services:
       - key: FRONTEND_ORIGIN
         sync: false
       - key: ARGOS_PACKAGES_DIR
-        value: /opt/render/project/src/.argos-packages
+        value: /opt/render/project/src/argos-packages
