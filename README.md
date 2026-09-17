@@ -64,7 +64,7 @@ VITE_TRANSLATION_API_URL=https://linguasheet-translation.onrender.com
 
 ### Render backend
 
-The included `render.yaml` installs `backend_requirements.txt`, starts `backend_main.py`, and checks `/health`.
+The included `render.yaml` installs `backend_requirements.txt`, installs the Japanese↔English and English↔Filipino Argos model pairs, starts `backend_main.py`, and checks `/health`. Override the model list with `ARGOS_PAIRS` using comma-separated pairs such as `ja:en,en:ja,en:tl,tl:en`.
 
 Set this Render environment variable to the deployed Vercel origin:
 
