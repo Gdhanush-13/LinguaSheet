@@ -1,0 +1,19 @@
+services:
+  linguasheet-translation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: linguasheet-translation:oracle-arm64
+    platform: linux/arm64
+    ports:
+      - "8080:8080"
+    environment:
+      ARGOS_DEVICE_TYPE: cpu
+      ARGOS_PACKAGES_DIR: /app/argos-packages
+      ARGOS_PAIRS: ja:en,tl:en
+      ARGOS_INTER_THREADS: "1"
+      ARGOS_INTRA_THREADS: "1"
+      ARGOS_BATCH_SIZE: "8"
+      FRONTEND_ORIGIN: https://lingua-sheet.vercel.app
+      PORT: "8080"
+    restart: unless-stopped

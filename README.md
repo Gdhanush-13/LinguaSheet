@@ -1,9 +1,3 @@
----
-title: LinguaSheet Translation API
-sdk: docker
-app_port: 7860
----
-
 # LinguaSheet
 
 Translate PDF text and export it to Excel.
@@ -15,11 +9,11 @@ No OpenAI, Google Translate, Azure Translator, or other paid translation API is 
 ## Live deployment
 
 - Frontend: https://lingua-sheet.vercel.app
-- Translation API: https://linguasheet-translation.onrender.com
-- API health check: https://linguasheet-translation.onrender.com/health
+- Backend: Oracle Cloud Always Free VM deployment (URL configured after VM setup)
 - Source repository: https://github.com/Gdhanush-13/LinguaSheet
 
-The Vercel project uses `VITE_TRANSLATION_API_URL` to connect to Render. Render uses `FRONTEND_ORIGIN` for CORS.
+The Vercel project uses `VITE_TRANSLATION_API_URL` to connect to the self-hosted
+backend. Set `FRONTEND_ORIGIN` to the Vercel origin on the backend.
 
 ## Features
 
@@ -68,18 +62,27 @@ Import this repository as a Vite project using the repository root. Add this pro
 VITE_TRANSLATION_API_URL=https://linguasheet-translation.onrender.com
 ```
 
-### Persistent Render backend
+### Oracle Cloud Always Free backend
 
-The included `render.yaml` uses Render's paid Standard plan (1 CPU and 2 GB
-RAM) with a 10 GB persistent disk mounted at `/var/data`. On the first start,
-the service downloads and installs only the priority Japanese-to-English and
-Tagalog-to-English Argos packages into `/var/data/argos-packages`. Later
-restarts reuse those packages. Override the model list with `ARGOS_PAIRS` using
-comma-separated pairs such as `ja:en,tl:en`.
+Google Cloud Run was not used because Google requires an active Cloud Billing
+account even when usage is intended to stay within the Free Tier. Render was
+also not upgraded. The recommended free-development host is an Oracle Cloud
+Always Free Ampere A1 VM. `Dockerfile` installs and verifies only the Japanese-
+to-English and Tagalog-to-English Argos packages inside the image, so runtime
+storage is not required for the model files.
+
+For an A1 Ubuntu VM, run `oracle-cloud-init.sh` or use the equivalent commands
+from `docker-compose.oracle.yml`. The VM must have inbound TCP 8080 allowed and
+should use HTTPS through a reverse proxy before production use.
 
 The PDF remains in the browser. The backend receives only extracted page text
 for translation and does not receive or store the uploaded PDF file. No public
 translation API is used.
+
+Render is intentionally not upgraded or used for the production backend. The
+Oracle Always Free VM is the target development host. Estimated monthly cost
+during eligible Oracle Always Free usage: $0, subject to Oracle capacity and
+account limits.
 
 The included `render.yaml` installs `backend_requirements.txt`, installs the priority Japanese→English and Filipino/Tagalog→English Argos model pairs, starts `backend_main.py`, and checks `/health`. Override the model list with `ARGOS_PAIRS` using comma-separated pairs such as `ja:en,tl:en`.
 
@@ -89,9 +92,9 @@ Set this Render environment variable to the deployed Vercel origin:
 FRONTEND_ORIGIN=https://lingua-sheet.vercel.app
 ```
 
-The service must remain on a paid plan because Render persistent disks are not
-available to Free web services. The first startup after the disk is attached
-may take several minutes while the two Argos packages download.
+The Docker image build requires network access to download the Argos packages,
+but the running service does not download models and does not depend on a
+persistent model disk.
 
 ## API
 
