@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">LinguaSheet</title>
+  <desc id="desc">A language character and spreadsheet grid</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#173b5f" />
+      <stop offset="1" stop-color="#2b7191" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)" />
+  <path d="M16 16h32v32H16z" fill="#f7fbff" opacity=".96" />
+  <path d="M16 27h32M16 38h32M27 16v32M38 16v32" fill="none" stroke="#79b8c3" stroke-width="2" />
+  <path d="M22 21c5 0 10 2 14 6-3 1-6 1-9 0-2-1-4-3-5-6Zm0 0c1 5 3 9 7 12" fill="none" stroke="#173b5f" stroke-linecap="round" stroke-width="2.4" />
+  <path d="M43 22v10M38 27h10" fill="none" stroke="#e1b65a" stroke-linecap="round" stroke-width="2.4" />
+</svg>
