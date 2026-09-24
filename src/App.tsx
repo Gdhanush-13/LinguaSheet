@@ -3,6 +3,7 @@ import { downloadBlob } from "./lib/download";
 import {
   detectLanguage,
   ENGLISH,
+  JAPANESE,
   LANGUAGES,
   type LanguageCode,
 } from "./lib/languages";
@@ -20,7 +21,7 @@ export default function App() {
   const [translatedPages, setTranslatedPages] = useState<PdfPage[]>([]);
   const [translatedPdf, setTranslatedPdf] = useState<Uint8Array>();
   const [translationReady, setTranslationReady] = useState(false);
-  const [source, setSource] = useState(ENGLISH);
+  const [source, setSource] = useState(JAPANESE);
   const [activePage, setActivePage] = useState(1);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -28,6 +29,23 @@ export default function App() {
   const baseName = file?.name.replace(/\.pdf$/i, "") ?? "linguasheet";
   const original = pages.find(({ page }) => page === activePage);
   const translated = translatedPages.find(({ page }) => page === activePage);
+
+  function reportOcr({
+    page,
+    totalPages,
+    progress,
+  }: {
+    page: number;
+    totalPages: number;
+    progress: number;
+  }) {
+    const percent = Math.round(progress * 100);
+    setBusy(
+      percent > 0
+        ? `Reading scanned page ${page}/${totalPages}: ${percent}%`
+        : `Loading OCR for scanned page ${page}/${totalPages}...`,
+    );
+  }
 
   async function chooseFile(nextFile?: File) {
     if (!nextFile) return;
@@ -46,10 +64,14 @@ export default function App() {
 
     setBusy("Reading pages...");
     try {
-      const extractedPages = await extractPdf(nextFile);
-      const detectedSource = detectLanguage(
-        extractedPages.map(({ text }) => text).join(" "),
-      );
+      const extractedPages = await extractPdf(nextFile, {
+        ocrLanguage: source.code,
+        onOcrProgress: reportOcr,
+      });
+      const usedOcr = extractedPages.some((page) => page.usedOcr);
+      const detectedSource = usedOcr
+        ? source
+        : detectLanguage(extractedPages.map(({ text }) => text).join(" "));
       setFile(nextFile);
       setPages(extractedPages);
       setTranslatedPages(extractedPages);
@@ -57,16 +79,23 @@ export default function App() {
       setSource(detectedSource);
       setActivePage(1);
       setTranslationReady(detectedSource.code === ENGLISH.code);
-    } catch {
+      if (!extractedPages.some((page) => page.text || page.fields.length)) {
+        setError(
+          "No text was recognized. Check the selected source language and try again.",
+        );
+      }
+    } catch (readError) {
       setError(
-        "Unable to read this PDF. Password-protected and corrupt files are not supported.",
+        readError instanceof Error
+          ? readError.message
+          : "Unable to read this PDF. Password-protected and corrupt files are not supported.",
       );
     } finally {
       setBusy("");
     }
   }
 
-  function changeSource(code: LanguageCode) {
+  async function changeSource(code: LanguageCode) {
     const nextSource = LANGUAGES.find((language) => language.code === code);
     if (!nextSource) return;
     setSource(nextSource);
@@ -74,6 +103,25 @@ export default function App() {
     setTranslatedPdf(undefined);
     setTranslationReady(nextSource.code === ENGLISH.code);
     setError("");
+    if (!file || !pages.some((page) => page.usedOcr)) return;
+
+    setBusy("Reloading scanned pages...");
+    try {
+      const extractedPages = await extractPdf(file, {
+        ocrLanguage: nextSource.code,
+        onOcrProgress: reportOcr,
+      });
+      setPages(extractedPages);
+      setTranslatedPages(extractedPages);
+    } catch (ocrError) {
+      setError(
+        ocrError instanceof Error
+          ? ocrError.message
+          : "Unable to read the scanned pages.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
   async function translate() {
@@ -150,7 +198,7 @@ export default function App() {
     setTranslatedPages([]);
     setTranslatedPdf(undefined);
     setTranslationReady(false);
-    setSource(ENGLISH);
+    setSource(JAPANESE);
     setActivePage(1);
     setError("");
     setBusy("");
@@ -176,34 +224,59 @@ export default function App() {
       </header>
       <section className="workspace">
         {!file ? (
-          <div
-            className="drop"
-            role="button"
-            tabIndex={0}
-            onClick={() => input.current?.click()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                input.current?.click();
-              }
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              void chooseFile(event.dataTransfer.files[0]);
-            }}
-          >
-            <b>{"\u2191"}</b>
-            <h2>{busy || "Drop a PDF to begin"}</h2>
-            <p>
-              or <u>browse files</u> {"\u00b7"} PDF only {"\u00b7"} up to 25 MB
-            </p>
-            <input
-              ref={input}
-              hidden
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={(event) => void chooseFile(event.target.files?.[0])}
-            />
+          <div className="upload-start">
+            <label className="scan-language">
+              Document language
+              <select
+                value={source.code}
+                disabled={Boolean(busy)}
+                onChange={(event) =>
+                  setSource(
+                    LANGUAGES.find(
+                      (language) => language.code === event.target.value,
+                    ) ?? JAPANESE,
+                  )
+                }
+              >
+                {LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.name}
+                  </option>
+                ))}
+              </select>
+              <small>Used only when a PDF page needs browser OCR.</small>
+            </label>
+            <div
+              className="drop"
+              role="button"
+              tabIndex={0}
+              onClick={() => input.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  input.current?.click();
+                }
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                void chooseFile(event.dataTransfer.files[0]);
+              }}
+            >
+              <b>{"\u2191"}</b>
+              <h2>{busy || "Drop a PDF to begin"}</h2>
+              <p>
+                or <u>browse files</u> {"\u00b7"} PDF only {"\u00b7"} up to 25 MB
+              </p>
+              <input
+                ref={input}
+                hidden
+                type="file"
+                accept="application/pdf,.pdf"
+                disabled={Boolean(busy)}
+                onChange={(event) => void chooseFile(event.target.files?.[0])}
+              />
+            </div>
+            {error && <div className="error">{error}</div>}
           </div>
         ) : (
           <>
@@ -222,6 +295,14 @@ export default function App() {
                   {pages.length} pages {"\u00b7"}{" "}
                   {(file.size / 1024 / 1024).toFixed(2)} MB
                 </small>
+                {pages.some((page) => page.usedOcr) && (
+                  <small>
+                    Browser OCR used on {pages.filter((page) => page.usedOcr).length}{" "}
+                    {pages.filter((page) => page.usedOcr).length === 1
+                      ? "page"
+                      : "pages"}
+                  </small>
+                )}
               </div>
               <button onClick={reset}>Start over</button>
             </div>
@@ -230,8 +311,9 @@ export default function App() {
                 Source language
                 <select
                   value={source.code}
+                  disabled={Boolean(busy)}
                   onChange={(event) =>
-                    changeSource(event.target.value as LanguageCode)
+                    void changeSource(event.target.value as LanguageCode)
                   }
                 >
                   {LANGUAGES.map((language) => (
@@ -257,9 +339,9 @@ export default function App() {
               </button>
             </div>
             <p className="note">
-              Selectable text and form values are translated into an English PDF
-              without OCR. Excel export renders that translated PDF page by page
-              into one worksheet, matching the PDF-to-Excel workflow.
+              Selectable text and form values are extracted directly when
+              available; scanned pages use local browser OCR. Excel export renders
+              the translated English PDF page by page into one worksheet.
             </p>
             {error && <div className="error">{error}</div>}
             {pages.length > 0 && (
@@ -303,7 +385,7 @@ export default function App() {
                       </h4>
                       <p>
                         {original?.text ||
-                          "No selectable text was found on this page. OCR is not used."}
+                          "No text was extracted or recognized on this page."}
                       </p>
                     </div>
                     <div className="result">

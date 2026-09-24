@@ -9,6 +9,8 @@ export const LANGUAGES: Language[] = [
 ];
 
 export const ENGLISH = LANGUAGES[0];
+export const FILIPINO = LANGUAGES[1];
+export const JAPANESE = LANGUAGES[2];
 
 const tagalogHints = /\b(ang|ng|mga|ito|iyon|ako|ikaw|kami|kayo|sila|ay|at|sa|para|mula|may|pag|hindi|kung|isang|pagsubok|kumusta)\b/gi;
 

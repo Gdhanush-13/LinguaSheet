@@ -2,13 +2,15 @@
 
 LinguaSheet extracts selectable text and AcroForm values directly from Japanese
 and Filipino (Tagalog) PDFs, translates them to English, and exports a
-translated English PDF and a page-for-page Excel workbook. It does not use OCR.
+translated English PDF and a page-for-page Excel workbook. Image-only pages use
+an automatic browser OCR fallback.
 
 Live app: https://lingua-sheet.vercel.app
 
 ## Features
 
 - Browser-side extraction of embedded PDF text and form-field values
+- Browser-side Tesseract OCR fallback for scanned Japanese and Filipino pages
 - Japanese and Filipino (Tagalog) to English translation
 - Downloadable English PDF generated from the translated content
 - One-sheet Excel output containing images of the translated English PDF pages
@@ -23,9 +25,11 @@ The app calls the MyMemory free translation endpoint directly from the browser.
 Long text is split below the service's 500-byte request limit. The service has a
 daily free-use quota, so large or repeated documents may reach that limit.
 
-Only extracted text and form values are sent for translation. The PDF file
-itself stays in the browser. Do not upload sensitive documents unless using the
-third-party translation service is acceptable for that data.
+Only extracted or OCR-recognized text and form values are sent for translation.
+The PDF file and page images stay in the browser. Tesseract language data is
+downloaded on demand and cached by the browser. Do not upload sensitive
+documents unless using the third-party translation service is acceptable for
+the extracted text.
 
 ## Run locally
 
@@ -54,6 +58,8 @@ a static site with the build command and publish directory above.
 
 - `src/App.tsx` coordinates the upload, translation, preview, and downloads.
 - `src/lib/pdf.ts` extracts embedded PDF text and AcroForm values in the browser.
+- `src/lib/pdf.ts` also renders empty pages locally and runs Tesseract with
+  `jpn` or `fil`, according to the selected document language.
 - `src/lib/translation.ts` protects structured values, splits text safely, and
   calls the free translation service.
 - `src/lib/translated-pdf.ts` creates the paginated English PDF.
@@ -63,8 +69,8 @@ a static site with the build command and publish directory above.
 
 ## Known limitations
 
-- Image-only and scanned PDFs are unsupported because OCR is intentionally not
-  used.
+- OCR quality depends on scan resolution and clarity. Handwriting, signatures,
+  checkboxes, and dense tables can require manual review.
 - The generated English PDF uses a clean document layout. It retains page
   grouping and content, but does not reproduce the source PDF's exact fonts,
   coordinates, graphics, or complex table geometry.

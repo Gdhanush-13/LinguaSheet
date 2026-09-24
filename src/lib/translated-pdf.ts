@@ -86,7 +86,7 @@ function drawHeader(
     thickness: 0.8,
     color: rgb(0.82, 0.85, 0.9),
   });
-  page.drawText("Generated from selectable PDF text without OCR", {
+  page.drawText("Generated from extracted text; scanned pages use browser OCR", {
     x: MARGIN,
     y: 24,
     size: 7.5,
@@ -132,7 +132,7 @@ export async function createTranslatedPdf(pages: PdfPage[]) {
     };
 
     const bodyLines = wrapText(
-      source.text || "No selectable text was found on this source page.",
+      source.text || "No text was extracted or recognized on this source page.",
       font,
       BODY_SIZE,
       maxWidth,

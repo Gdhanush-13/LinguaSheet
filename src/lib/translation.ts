@@ -109,7 +109,7 @@ export async function translatePages(
   );
   if (!hasContent) {
     throw new Error(
-      "No selectable PDF text or form values were found. This app does not use OCR.",
+      "No PDF text or form values were extracted or recognized.",
     );
   }
 

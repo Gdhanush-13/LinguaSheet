@@ -80,6 +80,30 @@ header p {
 .workspace {
   margin-bottom: 80px;
 }
+.upload-start {
+  display: grid;
+  gap: 14px;
+}
+.scan-language {
+  display: grid;
+  grid-template-columns: auto minmax(190px, 260px) 1fr;
+  gap: 10px;
+  align-items: center;
+  color: #536b8a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.scan-language select {
+  padding: 10px;
+  border: 1px solid #d8e1ec;
+  border-radius: 10px;
+  background: #fff;
+  color: #172033;
+}
+.scan-language small {
+  color: #8b98aa;
+  font-weight: 400;
+}
 .drop {
   min-height: 260px;
   border: 1.5px dashed #aebed4;
@@ -348,6 +372,9 @@ footer {
   font-size: 11px;
 }
 @media (max-width: 760px) {
+  .scan-language {
+    grid-template-columns: 1fr;
+  }
   nav {
     padding: 0 18px;
   }
