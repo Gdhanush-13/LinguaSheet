@@ -39,6 +39,16 @@ npm run dev
 npm run build
 ```
 
+## Deploy on Render
+
+The repository includes `render.yaml` for a Render static site. It runs
+`npm ci && npm run build` and publishes `dist`.
+
+If an existing Render service still runs Python, Argos, `pip`, or
+`install_argos_models.py`, that service is using its old backend settings.
+Create a new Blueprint from this repository, or change the existing service to
+a static site with the build command and publish directory above.
+
 ## Architecture
 
 - `src/App.tsx` coordinates the upload, translation, preview, and downloads.
