@@ -3,7 +3,7 @@ services:
     name: linguasheet-translation
     runtime: python
     plan: free
-    buildCommand: pip install -r backend_requirements.txt
+    buildCommand: pip install -r backend_requirements.txt && python install_argos_models.py
     startCommand: python -m uvicorn backend_main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
@@ -19,3 +19,5 @@ services:
         value: "1"
       - key: ARGOS_BATCH_SIZE
         value: "8"
+      - key: ARGOS_PAIRS
+        value: ja:en,tl:en

@@ -7,38 +7,10 @@ const langs: Lang[] = [
   ["en", "English"],
   ["tl", "Filipino (Tagalog)"],
   ["ja", "Japanese"],
-  ["es", "Spanish"],
-  ["fr", "French"],
-  ["de", "German"],
-  ["pt", "Portuguese"],
-  ["hi", "Hindi"],
-  ["te", "Telugu"],
-  ["ta", "Tamil"],
-  ["ar", "Arabic"],
-  ["zh", "Chinese"],
-  ["ko", "Korean"],
-  ["ru", "Russian"],
-  ["it", "Italian"],
-  ["nl", "Dutch"],
-  ["tr", "Turkish"],
-  ["vi", "Vietnamese"],
-  ["th", "Thai"],
 ].map(([code, name]) => ({ code, name }));
-const script: Record<string, RegExp> = {
-  ja: /[\u3040-\u30ff]/,
-  hi: /[\u0900-\u097f]/,
-  te: /[\u0c00-\u0c7f]/,
-  ta: /[\u0b80-\u0bff]/,
-  ar: /[\u0600-\u06ff]/,
-  zh: /[\u4e00-\u9fff]/,
-  ko: /[\uac00-\ud7af]/,
-  th: /[\u0e00-\u0e7f]/,
-  ru: /[\u0400-\u04ff]/,
-};
 const tagalogHints = /\b(ang|ng|mga|ito|iyon|ako|ikaw|kami|kayo|sila|ay|at|sa|para|mula|may|pag|hindi|kung|isang|pagsubok|kumusta)\b/gi;
 function detect(text: string) {
-  const hit = Object.entries(script).find(([, re]) => re.test(text));
-  if (hit) return langs.find((x) => x.code === hit[0]) ?? langs[0];
+  if (/[\u3040-\u30ff]/.test(text)) return langs.find((x) => x.code === "ja")!;
   const tagalogMatches = text.match(tagalogHints)?.length ?? 0;
   return tagalogMatches >= 2
     ? langs.find((x) => x.code === "tl") ?? langs[0]
@@ -54,9 +26,9 @@ function save(blob: Blob, name: string) {
 }
 async function translate(pages: PdfPage[], source: Lang, target: Lang) {
   if (source.code === target.code) return pages;
-  if (!pages.some((page) => page.text.trim())) {
+  if (!pages.some((page) => page.text.trim() || page.fields.some((field) => field.value.trim()))) {
     throw new Error(
-      "This PDF has no text layer. Scanned PDFs need OCR before translation.",
+      "No selectable PDF text or form values were found. This app does not use OCR.",
     );
   }
   const url = (
@@ -88,9 +60,7 @@ function App() {
   const [pages, setPages] = useState<PdfPage[]>([]);
   const [translated, setTranslated] = useState<PdfPage[]>([]);
   const [source, setSource] = useState(langs[0]);
-  const [target, setTarget] = useState(
-    langs.find((x) => x.code === "en") ?? langs[0],
-  );
+  const target = langs[0];
   const [active, setActive] = useState(1);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -138,6 +108,8 @@ function App() {
           page: p.page,
           original: p.text,
           translated: translated[i]?.text ?? p.text,
+          fields: p.fields,
+          translatedFields: translated[i]?.fields ?? p.fields,
         })),
         source.name,
         target.name,
@@ -207,6 +179,7 @@ function App() {
               <em>PDF</em>
               <div>
                 <strong>{file.name}</strong>
+                <small>{pages.reduce((count, page) => count + page.fields.length, 0)} form fields found</small>
                 <small>
                   {pages.length} pages · {(file.size / 1024 / 1024).toFixed(2)}{" "}
                   MB
@@ -235,19 +208,8 @@ function App() {
               <span>→</span>
               <label>
                 Translate to
-                <select
-                  value={target.code}
-                  onChange={(e) =>
-                    setTarget(
-                      langs.find((x) => x.code === e.target.value) ?? target,
-                    )
-                  }
-                >
-                  {langs.map((x) => (
-                    <option key={x.code} value={x.code}>
-                      {x.name}
-                    </option>
-                  ))}
+                <select value={target.code} disabled>
+                  <option value="en">English</option>
                 </select>
               </label>
               <button
@@ -261,7 +223,8 @@ function App() {
             <p className="note">
               Local/self-hosted translation keeps the API key out of the
               browser. The Translate button processes every page; the page list
-              only changes the preview. URLs, IDs, emails, phone numbers, and
+              only changes the preview. Selectable text and form values are
+              extracted directly without OCR. URLs, IDs, emails, phone numbers, and
               numeric values are preserved.
             </p>
             {error && <div className="error">{error}</div>}
@@ -299,7 +262,7 @@ function App() {
                       </h4>
                       <p>
                         {original?.text ||
-                          "No text layer found. Scanned PDFs need OCR support in the backend."}
+                          "No selectable text was found on this page. OCR is not used."}
                       </p>
                     </div>
                     <div className="result">

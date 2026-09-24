@@ -1,11 +1,10 @@
 import os
 
-# The Render persistent disk is mounted only when the service runs. The start
-# command invokes this script, so models are installed once and survive
-# restarts and redeploys.
+# Keep the package directory in sync with backend_main.py. Deployments can
+# override it for their own image or persistent volume.
 os.environ.setdefault(
     "ARGOS_PACKAGES_DIR",
-    "/var/data/argos-packages",
+    os.path.join(os.path.dirname(__file__), "argos-packages"),
 )
 os.environ.setdefault("ARGOS_DEVICE_TYPE", "cpu")
 os.environ.setdefault("ARGOS_INTER_THREADS", "1")

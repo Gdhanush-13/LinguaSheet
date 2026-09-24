@@ -2,8 +2,8 @@ import re
 import os
 import logging
 
-# Render mounts the persistent Argos disk at runtime. Keep a local fallback so
-# the backend still runs during local development.
+# Deployments can point this at persistent storage; use a project-local path
+# as the matching installer default during local development.
 os.environ.setdefault(
     "ARGOS_PACKAGES_DIR",
     os.path.join(os.path.dirname(__file__), "argos-packages"),
@@ -17,7 +17,7 @@ import argostranslate.translate
 import argostranslate.package
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="LinguaSheet self-hosted translation")
 logger = logging.getLogger("linguasheet")
@@ -34,9 +34,17 @@ app.add_middleware(
 )
 
 
+class FormField(BaseModel):
+    name: str
+    type: str
+    value: str
+    page: int | None = None
+
+
 class Page(BaseModel):
     page: int
     text: str
+    fields: list[FormField] = Field(default_factory=list)
 
 
 class TranslationRequest(BaseModel):
@@ -108,8 +116,15 @@ def translate(request: TranslationRequest):
         output = []
         for page in request.pages:
             safe_text, tokens = protect(page.text)
-            translated = translation.translate(safe_text)
-            output.append({"page": page.page, "text": restore(translated, tokens)})
+            translated = translation.translate(safe_text) if safe_text.strip() else ""
+            fields = []
+            for field in page.fields:
+                safe_value, field_tokens = protect(field.value)
+                translated_value = (
+                    translation.translate(safe_value) if safe_value.strip() else field.value
+                )
+                fields.append({**field.model_dump(), "value": restore(translated_value, field_tokens)})
+            output.append({"page": page.page, "text": restore(translated, tokens), "fields": fields})
         return {"pages": output}
     except Exception as exc:
         logger.exception("Translation failed for %s->%s", request.source, request.target)
