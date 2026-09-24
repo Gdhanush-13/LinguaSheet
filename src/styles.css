@@ -312,6 +312,14 @@ article {
   border-radius: 5px;
   font-size: 9px;
 }
+.compare h4 .translation-status {
+  margin-left: auto;
+  color: #a34712;
+  letter-spacing: normal;
+}
+.compare h4 .translation-status.ready {
+  color: #18794e;
+}
 .compare p {
   color: #334155;
   line-height: 1.75;

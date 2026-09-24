@@ -37,6 +37,16 @@ async function translate(pages: PdfPage[], source: Lang, target: Lang) {
   ).replace(/\/+$/, "");
   let r: Response;
   try {
+    const health = await fetch(`${url}/health`);
+    if (health.ok) {
+      const status = await health.json();
+      if (Array.isArray(status.installed_languages) && !status.installed_languages.includes(source.code)) {
+        const missing = source.code === "ja" ? "Japanese" : "Filipino (Tagalog)";
+        throw new Error(
+          `The translation server is online, but its ${missing} model is not installed. Redeploy the Render service from the latest main branch so it installs the ja→en and tl→en models.`,
+        );
+      }
+    }
     r = await fetch(`${url}/translate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -59,6 +69,7 @@ function App() {
   const [file, setFile] = useState<File>();
   const [pages, setPages] = useState<PdfPage[]>([]);
   const [translated, setTranslated] = useState<PdfPage[]>([]);
+  const [translationReady, setTranslationReady] = useState(false);
   const [source, setSource] = useState(langs[0]);
   const target = langs[0];
   const [active, setActive] = useState(1);
@@ -80,7 +91,9 @@ function App() {
       setFile(f);
       setPages(p);
       setTranslated(p);
-      setSource(detect(p.map((x) => x.text).join(" ")));
+      const detectedSource = detect(p.map((x) => x.text).join(" "));
+      setSource(detectedSource);
+      setTranslationReady(detectedSource.code === target.code);
     } catch {
       setError(
         "Unable to read this PDF. Password-protected and corrupt files are not supported.",
@@ -93,7 +106,9 @@ function App() {
     setBusy("Translating locally…");
     setError("");
     try {
-      setTranslated(await translate(pages, source, target));
+      const result = await translate(pages, source, target);
+      setTranslated(result);
+      setTranslationReady(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Translation failed.");
     } finally {
@@ -107,9 +122,11 @@ function App() {
         pages.map((p, i) => ({
           page: p.page,
           original: p.text,
-          translated: translated[i]?.text ?? p.text,
+          translated: translationReady ? translated[i]?.text ?? p.text : "",
           fields: p.fields,
-          translatedFields: translated[i]?.fields ?? p.fields,
+          translatedFields: translationReady
+            ? translated[i]?.fields ?? p.fields
+            : p.fields.map((field) => ({ ...field, value: "" })),
         })),
         source.name,
         target.name,
@@ -121,6 +138,7 @@ function App() {
     setFile(undefined);
     setPages([]);
     setTranslated([]);
+    setTranslationReady(false);
     setError("");
     setBusy("");
     if (input.current) input.current.value = "";
@@ -193,9 +211,11 @@ function App() {
                 <select
                   value={source.code}
                   onChange={(e) =>
-                    setSource(
-                      langs.find((x) => x.code === e.target.value) ?? source,
-                    )
+                    (() => {
+                      const next = langs.find((x) => x.code === e.target.value) ?? source;
+                      setSource(next);
+                      setTranslationReady(next.code === target.code);
+                    })()
                   }
                 >
                   {langs.map((x) => (
@@ -266,11 +286,16 @@ function App() {
                       </p>
                     </div>
                     <div className="result">
-                      <h4>
+                    <h4>
                         TRANSLATED <small>{target.code.toUpperCase()}</small>
+                        <span className={`translation-status ${translationReady ? "ready" : ""}`}>
+                          {translationReady ? "Ready" : error ? "Failed" : "Not translated"}
+                        </span>
                       </h4>
                       <p>
-                        {current?.text || "Translate to preview the result."}
+                        {translationReady
+                          ? current?.text || "No text content on this page."
+                          : error || "Use Translate PDF above to create an English translation."}
                       </p>
                     </div>
                   </div>
@@ -292,6 +317,7 @@ function App() {
                           `${base}-${target.code}.txt`,
                         )
                       }
+                      disabled={!translationReady}
                     >
                       Download translated text
                     </button>
