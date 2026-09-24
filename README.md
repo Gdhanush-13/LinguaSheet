@@ -2,7 +2,7 @@
 
 LinguaSheet extracts selectable text and AcroForm values directly from Japanese
 and Filipino (Tagalog) PDFs, translates them to English, and exports a
-reviewable Excel workbook. It does not use OCR.
+translated English PDF and a page-for-page Excel workbook. It does not use OCR.
 
 Live app: https://lingua-sheet.vercel.app
 
@@ -10,8 +10,9 @@ Live app: https://lingua-sheet.vercel.app
 
 - Browser-side extraction of embedded PDF text and form-field values
 - Japanese and Filipino (Tagalog) to English translation
-- Separate `Translation` and `Form Fields` Excel worksheets
-- Original and translated values kept side by side
+- Downloadable English PDF generated from the translated content
+- One-sheet Excel output containing images of the translated English PDF pages
+- Original PDF page order and form-field grouping retained in the English output
 - URLs, email addresses, phone numbers, IDs, codes, and numeric references
   protected during translation
 - No server, API key, or paid translation account required
@@ -55,7 +56,8 @@ a static site with the build command and publish directory above.
 - `src/lib/pdf.ts` extracts embedded PDF text and AcroForm values in the browser.
 - `src/lib/translation.ts` protects structured values, splits text safely, and
   calls the free translation service.
-- `src/lib/workbook.ts` creates the Excel workbook.
+- `src/lib/translated-pdf.ts` creates the paginated English PDF.
+- `src/lib/workbook.ts` renders the English PDF pages and embeds them in Excel.
 - `src/lib/languages.ts` contains supported languages and source detection.
 - `src/lib/download.ts` handles browser downloads.
 
@@ -63,8 +65,11 @@ a static site with the build command and publish directory above.
 
 - Image-only and scanned PDFs are unsupported because OCR is intentionally not
   used.
-- Complex visual tables are exported as page text rather than reconstructed
-  cell by cell.
+- The generated English PDF uses a clean document layout. It retains page
+  grouping and content, but does not reproduce the source PDF's exact fonts,
+  coordinates, graphics, or complex table geometry.
+- Excel contains rendered page images, following the original PDF-to-Excel
+  application's workflow. Its content is not split into editable table cells.
 - Translation quality varies by content; review important translations before
   relying on them.
 - The anonymous translation quota is suitable for trials and light usage, not

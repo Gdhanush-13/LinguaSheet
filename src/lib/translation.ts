@@ -119,6 +119,7 @@ export async function translatePages(
     for (const field of page.fields) {
       fields.push({
         ...field,
+        name: await translateText(field.name, sourceCode, targetCode),
         value: await translateText(field.value, sourceCode, targetCode),
       });
     }

@@ -8,7 +8,8 @@ import {
 } from "./lib/languages";
 import { extractPdf, type PdfPage } from "./lib/pdf";
 import { translatePages } from "./lib/translation";
-import { createWorkbook } from "./lib/workbook";
+import { createTranslatedPdf } from "./lib/translated-pdf";
+import { createPdfImageWorkbook } from "./lib/workbook";
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
@@ -17,6 +18,7 @@ export default function App() {
   const [file, setFile] = useState<File>();
   const [pages, setPages] = useState<PdfPage[]>([]);
   const [translatedPages, setTranslatedPages] = useState<PdfPage[]>([]);
+  const [translatedPdf, setTranslatedPdf] = useState<Uint8Array>();
   const [translationReady, setTranslationReady] = useState(false);
   const [source, setSource] = useState(ENGLISH);
   const [activePage, setActivePage] = useState(1);
@@ -51,6 +53,7 @@ export default function App() {
       setFile(nextFile);
       setPages(extractedPages);
       setTranslatedPages(extractedPages);
+      setTranslatedPdf(undefined);
       setSource(detectedSource);
       setActivePage(1);
       setTranslationReady(detectedSource.code === ENGLISH.code);
@@ -68,6 +71,7 @@ export default function App() {
     if (!nextSource) return;
     setSource(nextSource);
     setTranslatedPages(pages);
+    setTranslatedPdf(undefined);
     setTranslationReady(nextSource.code === ENGLISH.code);
     setError("");
   }
@@ -76,9 +80,12 @@ export default function App() {
     setBusy("Translating...");
     setError("");
     setTranslationReady(false);
+    setTranslatedPdf(undefined);
     try {
       const result = await translatePages(pages, source.code, ENGLISH.code);
       setTranslatedPages(result);
+      setBusy("Creating English PDF...");
+      setTranslatedPdf(await createTranslatedPdf(result));
       setTranslationReady(true);
     } catch (translationError) {
       setError(
@@ -92,39 +99,56 @@ export default function App() {
   }
 
   async function downloadWorkbook() {
-    if (!file) return;
-    const blob = await createWorkbook(
-      pages.map((page, index) => ({
-        page: page.page,
-        original: page.text,
-        translated: translationReady
-          ? translatedPages[index]?.text ?? page.text
-          : "",
-        fields: page.fields,
-        translatedFields: translationReady
-          ? translatedPages[index]?.fields ?? page.fields
-          : page.fields.map((field) => ({ ...field, value: "" })),
-      })),
-      source.name,
-      ENGLISH.name,
-    );
-    downloadBlob(blob, `${baseName}-${ENGLISH.code}.xlsx`);
+    if (!file || !translationReady) return;
+    setBusy("Converting English PDF to Excel...");
+    setError("");
+    try {
+      const pdfBytes =
+        translatedPdf ?? (await createTranslatedPdf(translatedPages));
+      if (!translatedPdf) setTranslatedPdf(pdfBytes);
+      const workbook = await createPdfImageWorkbook(pdfBytes);
+      downloadBlob(workbook, `${baseName}-${ENGLISH.code}.xlsx`);
+    } catch (conversionError) {
+      setError(
+        conversionError instanceof Error
+          ? conversionError.message
+          : "Unable to convert the English PDF to Excel.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
-  function downloadText() {
-    const text = translatedPages
-      .map((page) => `Page ${page.page}\n${page.text}`)
-      .join("\n\n");
-    downloadBlob(
-      new Blob([text], { type: "text/plain;charset=utf-8" }),
-      `${baseName}-${ENGLISH.code}.txt`,
-    );
+  async function downloadTranslatedPdf() {
+    if (!translationReady) return;
+    setBusy("Preparing English PDF...");
+    setError("");
+    try {
+      const pdfBytes =
+        translatedPdf ?? (await createTranslatedPdf(translatedPages));
+      if (!translatedPdf) setTranslatedPdf(pdfBytes);
+      const pdfBuffer = new ArrayBuffer(pdfBytes.byteLength);
+      new Uint8Array(pdfBuffer).set(pdfBytes);
+      downloadBlob(
+        new Blob([pdfBuffer], { type: "application/pdf" }),
+        `${baseName}-${ENGLISH.code}.pdf`,
+      );
+    } catch (pdfError) {
+      setError(
+        pdfError instanceof Error
+          ? pdfError.message
+          : "Unable to create the English PDF.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
   function reset() {
     setFile(undefined);
     setPages([]);
     setTranslatedPages([]);
+    setTranslatedPdf(undefined);
     setTranslationReady(false);
     setSource(ENGLISH);
     setActivePage(1);
@@ -148,7 +172,7 @@ export default function App() {
           <br />
           <i>Structure the data.</i>
         </h1>
-        <p>Convert multilingual PDFs into reviewable, readable Excel workbooks.</p>
+        <p>Translate PDFs to English, then convert the English pages to Excel.</p>
       </header>
       <section className="workspace">
         {!file ? (
@@ -233,10 +257,9 @@ export default function App() {
               </button>
             </div>
             <p className="note">
-              Free-tier translation processes every page; the page list only
-              changes the preview. Selectable text and form values are extracted
-              directly without OCR. URLs, IDs, emails, phone numbers, and numeric
-              values are preserved.
+              Selectable text and form values are translated into an English PDF
+              without OCR. Excel export renders that translated PDF page by page
+              into one worksheet, matching the PDF-to-Excel workflow.
             </p>
             {error && <div className="error">{error}</div>}
             {pages.length > 0 && (
@@ -266,7 +289,10 @@ export default function App() {
                         {source.name} <i>{"\u2192"}</i> {ENGLISH.name}
                       </strong>
                     </div>
-                    <button onClick={() => void downloadWorkbook()}>
+                    <button
+                      disabled={!translationReady || Boolean(busy)}
+                      onClick={() => void downloadWorkbook()}
+                    >
                       Export Excel {"\u2193"}
                     </button>
                   </div>
@@ -304,12 +330,16 @@ export default function App() {
                   <div className="actions">
                     <button
                       className="primary"
+                      disabled={!translationReady || Boolean(busy)}
                       onClick={() => void downloadWorkbook()}
                     >
                       Download Excel {"\u2193"}
                     </button>
-                    <button onClick={downloadText} disabled={!translationReady}>
-                      Download translated text
+                    <button
+                      onClick={() => void downloadTranslatedPdf()}
+                      disabled={!translationReady || Boolean(busy)}
+                    >
+                      Download English PDF
                     </button>
                   </div>
                 </article>
