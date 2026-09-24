@@ -179,7 +179,7 @@ export default function App() {
       new Uint8Array(pdfBuffer).set(pdfBytes);
       downloadBlob(
         new Blob([pdfBuffer], { type: "application/pdf" }),
-        `${baseName}-${ENGLISH.code}.pdf`,
+        file?.name ?? `${baseName}.pdf`,
       );
     } catch (pdfError) {
       setError(
