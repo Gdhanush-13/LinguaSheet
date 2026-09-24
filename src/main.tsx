@@ -33,7 +33,7 @@ function protect(text: string) {
   return {
     text: text.replace(protectedValue, (value) => {
       values.push(value);
-      return ` __LS_${values.length - 1}__ `;
+      return ` https://ls.invalid/${values.length - 1} `;
     }),
     values,
   };
@@ -41,7 +41,7 @@ function protect(text: string) {
 
 function restore(text: string, values: string[]) {
   return text.replace(
-    /__LS_(\d+)__/g,
+    /https:\/\/ls\.invalid\/(\d+)/g,
     (_, index: string) => values[Number(index)] ?? _,
   );
 }
