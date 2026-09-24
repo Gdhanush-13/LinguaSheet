@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { PdfPage } from "./pdf";
 
 const PAGE_WIDTH = 595.28;
@@ -56,45 +56,6 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
     .flatMap((line) => wrapLine(line, font, size, maxWidth));
 }
 
-function drawHeader(
-  page: PDFPage,
-  font: PDFFont,
-  bold: PDFFont,
-  sourcePage: number,
-  continued: boolean,
-) {
-  page.drawText("LINGUASHEET", {
-    x: MARGIN,
-    y: PAGE_HEIGHT - MARGIN,
-    size: 9,
-    font: bold,
-    color: rgb(0.12, 0.37, 0.82),
-  });
-  page.drawText(
-    `English translation - source page ${sourcePage}${continued ? " (continued)" : ""}`,
-    {
-      x: MARGIN,
-      y: PAGE_HEIGHT - MARGIN - 22,
-      size: 15,
-      font: bold,
-      color: rgb(0.08, 0.11, 0.18),
-    },
-  );
-  page.drawLine({
-    start: { x: MARGIN, y: PAGE_HEIGHT - MARGIN - 34 },
-    end: { x: PAGE_WIDTH - MARGIN, y: PAGE_HEIGHT - MARGIN - 34 },
-    thickness: 0.8,
-    color: rgb(0.82, 0.85, 0.9),
-  });
-  page.drawText("Generated from extracted text; scanned pages use browser OCR", {
-    x: MARGIN,
-    y: 24,
-    size: 7.5,
-    font,
-    color: rgb(0.42, 0.46, 0.54),
-  });
-}
-
 export async function createTranslatedPdf(pages: PdfPage[]) {
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
@@ -103,15 +64,11 @@ export async function createTranslatedPdf(pages: PdfPage[]) {
 
   for (const source of pages) {
     let page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    let continued = false;
-    let y = PAGE_HEIGHT - MARGIN - 58;
-    drawHeader(page, font, bold, source.page, continued);
+    let y = PAGE_HEIGHT - MARGIN;
 
     const nextPage = () => {
       page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      continued = true;
-      y = PAGE_HEIGHT - MARGIN - 58;
-      drawHeader(page, font, bold, source.page, continued);
+      y = PAGE_HEIGHT - MARGIN;
     };
 
     const drawLines = (lines: string[], options?: { bold?: boolean; gap?: number }) => {
@@ -131,25 +88,19 @@ export async function createTranslatedPdf(pages: PdfPage[]) {
       }
     };
 
-    const bodyLines = wrapText(
-      source.text || "No text was extracted or recognized on this source page.",
-      font,
-      BODY_SIZE,
-      maxWidth,
-    );
-    drawLines(bodyLines);
+    if (source.text) {
+      drawLines(wrapText(source.text, font, BODY_SIZE, maxWidth));
+    }
 
     if (source.fields.length) {
-      drawLines(["Form fields"], { bold: true, gap: 14 });
       for (const field of source.fields) {
-        const label = `${field.name} (${field.type})`;
-        drawLines(wrapText(label, bold, BODY_SIZE, maxWidth), {
+        drawLines(wrapText(field.name, bold, BODY_SIZE, maxWidth), {
           bold: true,
-          gap: 5,
+          gap: source.text ? 10 : 0,
         });
-        drawLines(
-          wrapText(field.value || "(empty)", font, BODY_SIZE, maxWidth),
-        );
+        if (field.value) {
+          drawLines(wrapText(field.value, font, BODY_SIZE, maxWidth));
+        }
       }
     }
   }

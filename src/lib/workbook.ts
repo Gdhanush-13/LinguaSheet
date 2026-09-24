@@ -8,10 +8,9 @@ export async function createPdfImageWorkbook(
   quality: ImageQuality = "high",
   onProgress?: (percent: number) => void,
 ) {
-  const pdf = await getDocument({ data: pdfBytes.slice() }).promise;
+    const pdf = await getDocument({ data: pdfBytes.slice() }).promise;
   try {
     const book = new ExcelJS.Workbook();
-    book.creator = "LinguaSheet";
     const sheet = book.addWorksheet("Sheet1");
     sheet.views = [{ showGridLines: false }];
     let row = 1;
