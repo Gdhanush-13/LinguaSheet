@@ -39,6 +39,16 @@ npm run dev
 npm run build
 ```
 
+## Architecture
+
+- `src/App.tsx` coordinates the upload, translation, preview, and downloads.
+- `src/lib/pdf.ts` extracts embedded PDF text and AcroForm values in the browser.
+- `src/lib/translation.ts` protects structured values, splits text safely, and
+  calls the free translation service.
+- `src/lib/workbook.ts` creates the Excel workbook.
+- `src/lib/languages.ts` contains supported languages and source detection.
+- `src/lib/download.ts` handles browser downloads.
+
 ## Known limitations
 
 - Image-only and scanned PDFs are unsupported because OCR is intentionally not
