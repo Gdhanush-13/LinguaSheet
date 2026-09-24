@@ -1,109 +1,144 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import type { PdfPage } from "./pdf";
+import { PDFDocument } from "pdf-lib";
+import { getDocument } from "pdfjs-dist";
+import { pdfOptions, type PdfPage, type PdfRect, type PdfRegion } from "./pdf";
 
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const MARGIN = 48;
-const BODY_SIZE = 10.5;
-const LINE_HEIGHT = 15;
+const RENDER_SCALE = 2;
 
-function pdfSafe(text: string) {
-  return text
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/[\u2013\u2014]/g, "-")
-    .replace(/\u2026/g, "...")
-    .replace(/[^\x09\x0a\x0d\x20-\x7e\xa0-\xff]/g, "?");
+function pixelRect(rect: PdfRect, width: number, height: number) {
+  return {
+    x: rect.x * width,
+    y: rect.y * height,
+    width: rect.width * width,
+    height: rect.height * height,
+  };
 }
 
-function wrapLine(text: string, font: PDFFont, size: number, maxWidth: number) {
-  if (!text) return [""];
-  const words = pdfSafe(text).split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = "";
-
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
-      line = candidate;
-      continue;
-    }
-    if (line) lines.push(line);
-    if (font.widthOfTextAtSize(word, size) <= maxWidth) {
-      line = word;
-      continue;
-    }
-
-    let fragment = "";
-    for (const character of word) {
-      if (font.widthOfTextAtSize(fragment + character, size) <= maxWidth) {
-        fragment += character;
-      } else {
-        if (fragment) lines.push(fragment);
-        fragment = character;
-      }
-    }
-    line = fragment;
-  }
-
-  if (line) lines.push(line);
-  return lines.length ? lines : [""];
+function backgroundColor(
+  context: CanvasRenderingContext2D,
+  rect: ReturnType<typeof pixelRect>,
+) {
+  const points = [
+    [rect.x - 2, rect.y - 2],
+    [rect.x + rect.width + 2, rect.y - 2],
+    [rect.x - 2, rect.y + rect.height + 2],
+    [rect.x + rect.width + 2, rect.y + rect.height + 2],
+  ];
+  const colors = points.map(([x, y]) =>
+    context.getImageData(
+      Math.max(0, Math.min(context.canvas.width - 1, Math.round(x))),
+      Math.max(0, Math.min(context.canvas.height - 1, Math.round(y))),
+      1,
+      1,
+    ).data,
+  );
+  const brightest = colors.sort(
+    (first, second) =>
+      second[0] + second[1] + second[2] - (first[0] + first[1] + first[2]),
+  )[0];
+  return `rgb(${brightest[0]}, ${brightest[1]}, ${brightest[2]})`;
 }
 
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  return text
-    .split(/\r?\n/)
-    .flatMap((line) => wrapLine(line, font, size, maxWidth));
+function overlapsVertically(first: PdfRegion, second: PdfRegion) {
+  const overlap =
+    Math.min(first.y + first.height, second.y + second.height) -
+    Math.max(first.y, second.y);
+  return overlap > Math.min(first.height, second.height) * 0.35;
 }
 
-export async function createTranslatedPdf(pages: PdfPage[]) {
-  const document = await PDFDocument.create();
-  const font = await document.embedFont(StandardFonts.Helvetica);
-  const bold = await document.embedFont(StandardFonts.HelveticaBold);
-  const maxWidth = PAGE_WIDTH - MARGIN * 2;
+function availableWidth(region: PdfRegion, regions: PdfRegion[], canvasWidth: number) {
+  const rightNeighbor = regions
+    .filter(
+      (candidate) =>
+        candidate !== region &&
+        candidate.x > region.x + region.width * 0.4 &&
+        overlapsVertically(region, candidate),
+    )
+    .sort((a, b) => a.x - b.x)[0];
+  const rightEdge = rightNeighbor ? rightNeighbor.x * canvasWidth - 4 : canvasWidth - 4;
+  return Math.max(region.width * canvasWidth, rightEdge - region.x * canvasWidth);
+}
 
-  for (const source of pages) {
-    let page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    let y = PAGE_HEIGHT - MARGIN;
+function applyTranslatedRegions(
+  context: CanvasRenderingContext2D,
+  regions: PdfRegion[],
+) {
+  const { width, height } = context.canvas;
+  const overlays = regions.filter((region) => region.overlay && region.text.trim());
 
-    const nextPage = () => {
-      page = document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      y = PAGE_HEIGHT - MARGIN;
-    };
-
-    const drawLines = (lines: string[], options?: { bold?: boolean; gap?: number }) => {
-      if (options?.gap) y -= options.gap;
-      for (const line of lines) {
-        if (y < 48) nextPage();
-        if (line) {
-          page.drawText(line, {
-            x: MARGIN,
-            y,
-            size: BODY_SIZE,
-            font: options?.bold ? bold : font,
-            color: rgb(0.1, 0.13, 0.2),
-          });
-        }
-        y -= LINE_HEIGHT;
-      }
-    };
-
-    if (source.text) {
-      drawLines(wrapText(source.text, font, BODY_SIZE, maxWidth));
-    }
-
-    if (source.fields.length) {
-      for (const field of source.fields) {
-        drawLines(wrapText(field.name, bold, BODY_SIZE, maxWidth), {
-          bold: true,
-          gap: source.text ? 10 : 0,
-        });
-        if (field.value) {
-          drawLines(wrapText(field.value, font, BODY_SIZE, maxWidth));
-        }
-      }
+  for (const region of overlays) {
+    const masks = region.masks.length ? region.masks : [region];
+    for (const mask of masks) {
+      const rect = pixelRect(mask, width, height);
+      const padding = Math.max(1.5, rect.height * 0.12);
+      context.fillStyle = backgroundColor(context, rect);
+      context.fillRect(
+        rect.x - padding,
+        rect.y - padding,
+        rect.width + padding * 2,
+        rect.height + padding * 2,
+      );
     }
   }
 
-  return document.save();
+  for (const region of overlays) {
+    const rect = pixelRect(region, width, height);
+    const maxWidth = availableWidth(region, regions, width);
+    let fontSize = Math.min(24, Math.max(9, rect.height * 0.82));
+    context.font = `500 ${fontSize}px Arial, sans-serif`;
+    while (context.measureText(region.text).width > maxWidth && fontSize > 7) {
+      fontSize -= 0.5;
+      context.font = `500 ${fontSize}px Arial, sans-serif`;
+    }
+
+    context.fillStyle = "#111827";
+    context.textBaseline = "top";
+    context.fillText(
+      region.text.replace(/\s+/g, " ").trim(),
+      rect.x,
+      rect.y + Math.max(0, (rect.height - fontSize) / 2),
+      maxWidth,
+    );
+  }
+}
+
+export async function createTranslatedPdf(file: File, pages: PdfPage[]) {
+  const source = await getDocument({
+    data: await file.arrayBuffer(),
+    ...pdfOptions,
+  }).promise;
+  const output = await PDFDocument.create();
+
+  try {
+    for (const translatedPage of pages) {
+      const sourcePage = await source.getPage(translatedPage.page);
+      const viewport = sourcePage.getViewport({ scale: RENDER_SCALE });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Canvas rendering is unavailable.");
+
+      await sourcePage.render({ canvasContext: context, viewport }).promise;
+      applyTranslatedRegions(context, translatedPage.regions);
+
+      const image = await output.embedPng(canvas.toDataURL("image/png"));
+      const pdfPage = output.addPage([
+        viewport.width / RENDER_SCALE,
+        viewport.height / RENDER_SCALE,
+      ]);
+      pdfPage.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: pdfPage.getWidth(),
+        height: pdfPage.getHeight(),
+      });
+
+      canvas.width = 1;
+      canvas.height = 1;
+      sourcePage.cleanup();
+    }
+    return output.save();
+  } finally {
+    await source.destroy();
+  }
 }

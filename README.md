@@ -13,6 +13,7 @@ Live app: https://lingua-sheet.vercel.app
 - Browser-side Tesseract OCR fallback for scanned Japanese and Filipino pages
 - Japanese and Filipino (Tagalog) to English translation
 - Downloadable English PDF generated from the translated content
+- Layout-preserving translation overlays on the rendered source pages
 - One-sheet Excel output containing images of the translated English PDF pages
 - Original PDF page order and form-field grouping retained in the English output
 - URLs, email addresses, phone numbers, IDs, codes, and numeric references
@@ -62,7 +63,8 @@ a static site with the build command and publish directory above.
   `jpn` or `fil`, according to the selected document language.
 - `src/lib/translation.ts` protects structured values, splits text safely, and
   calls the free translation service.
-- `src/lib/translated-pdf.ts` creates the paginated English PDF.
+- `src/lib/translated-pdf.ts` masks detected source text and fits translated
+  English into the same page regions while retaining the rendered background.
 - `src/lib/workbook.ts` renders the English PDF pages and embeds them in Excel.
 - `src/lib/languages.ts` contains supported languages and source detection.
 - `src/lib/download.ts` handles browser downloads.
@@ -71,9 +73,9 @@ a static site with the build command and publish directory above.
 
 - OCR quality depends on scan resolution and clarity. Handwriting, signatures,
   checkboxes, and dense tables can require manual review.
-- The generated English PDF uses a clean document layout. It retains page
-  grouping and content, but does not reproduce the source PDF's exact fonts,
-  coordinates, graphics, or complex table geometry.
+- The generated English PDF retains page dimensions, graphics, lines, and
+  approximate text positions. English expansion, OCR errors, handwriting, and
+  tightly packed regions can prevent a pixel-perfect match.
 - Excel contains rendered page images, following the original PDF-to-Excel
   application's workflow. Its content is not split into editable table cells.
 - Translation quality varies by content; review important translations before

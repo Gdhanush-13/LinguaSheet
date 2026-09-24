@@ -125,6 +125,7 @@ export default function App() {
   }
 
   async function translate() {
+    if (!file) return;
     setBusy("Translating...");
     setError("");
     setTranslationReady(false);
@@ -133,7 +134,7 @@ export default function App() {
       const result = await translatePages(pages, source.code, ENGLISH.code);
       setTranslatedPages(result);
       setBusy("Creating English PDF...");
-      setTranslatedPdf(await createTranslatedPdf(result));
+      setTranslatedPdf(await createTranslatedPdf(file, result));
       setTranslationReady(true);
     } catch (translationError) {
       setError(
@@ -152,7 +153,7 @@ export default function App() {
     setError("");
     try {
       const pdfBytes =
-        translatedPdf ?? (await createTranslatedPdf(translatedPages));
+        translatedPdf ?? (await createTranslatedPdf(file, translatedPages));
       if (!translatedPdf) setTranslatedPdf(pdfBytes);
       const workbook = await createPdfImageWorkbook(pdfBytes);
       downloadBlob(workbook, `${baseName}-${ENGLISH.code}.xlsx`);
@@ -168,12 +169,12 @@ export default function App() {
   }
 
   async function downloadTranslatedPdf() {
-    if (!translationReady) return;
+    if (!file || !translationReady) return;
     setBusy("Preparing English PDF...");
     setError("");
     try {
       const pdfBytes =
-        translatedPdf ?? (await createTranslatedPdf(translatedPages));
+        translatedPdf ?? (await createTranslatedPdf(file, translatedPages));
       if (!translatedPdf) setTranslatedPdf(pdfBytes);
       const pdfBuffer = new ArrayBuffer(pdfBytes.byteLength);
       new Uint8Array(pdfBuffer).set(pdfBytes);

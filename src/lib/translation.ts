@@ -4,6 +4,8 @@ import type { PdfPage } from "./pdf";
 const TRANSLATION_ENDPOINT = "https://api.mymemory.translated.net/get";
 const MAX_QUERY_BYTES = 450;
 const protectedValue = /https?:\/\/\S+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\+?\d[\d\s().-]{5,}\d|\b[A-Z0-9][A-Z0-9/_-]{3,}\b/g;
+const japaneseScript = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/;
+const letter = /\p{L}/u;
 
 type TranslationResponse = {
   responseData?: { translatedText?: unknown };
@@ -115,6 +117,26 @@ export async function translatePages(
 
   const output: PdfPage[] = [];
   for (const page of pages) {
+    const regions = [];
+    for (const region of page.regions) {
+      const japaneseCharacters = region.text.match(
+        /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g,
+      )?.length ?? 0;
+      const reliableRegion =
+        region.height < 0.045 &&
+        (region.confidence >= 40 || japaneseCharacters >= 2);
+      const overlay =
+        sourceCode === "ja"
+          ? reliableRegion && japaneseScript.test(region.text)
+          : sourceCode === "tl" && reliableRegion && letter.test(region.text);
+      regions.push({
+        ...region,
+        text: overlay
+          ? await translateText(region.text, sourceCode, targetCode)
+          : region.text,
+        overlay,
+      });
+    }
     const fields = [];
     for (const field of page.fields) {
       fields.push({
@@ -125,8 +147,11 @@ export async function translatePages(
     }
     output.push({
       ...page,
-      text: await translateText(page.text, sourceCode, targetCode),
+      text: regions.length
+        ? regions.map((region) => region.text).join("\n")
+        : await translateText(page.text, sourceCode, targetCode),
       fields,
+      regions,
     });
   }
   return output;
