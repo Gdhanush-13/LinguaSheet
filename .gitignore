@@ -3,7 +3,6 @@ dist/
 .env
 .env.local
 .venv/
-argos-packages/
 __pycache__/
 .vercel/
 .npm-cache/

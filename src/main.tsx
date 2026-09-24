@@ -24,6 +24,77 @@ function save(blob: Blob, name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(u), 700);
 }
+
+const protectedValue =
+  /https?:\/\/\S+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\+?\d[\d\s().-]{5,}\d|\b[A-Z0-9][A-Z0-9/_-]{3,}\b/g;
+
+function protect(text: string) {
+  const values: string[] = [];
+  return {
+    text: text.replace(protectedValue, (value) => {
+      values.push(value);
+      return ` __LS_${values.length - 1}__ `;
+    }),
+    values,
+  };
+}
+
+function restore(text: string, values: string[]) {
+  return text.replace(
+    /__LS_(\d+)__/g,
+    (_, index: string) => values[Number(index)] ?? _,
+  );
+}
+
+function splitForTranslation(text: string, maxBytes = 450) {
+  const encoder = new TextEncoder();
+  const chunks: string[] = [];
+  let chunk = "";
+  for (const character of text) {
+    if (encoder.encode(chunk + character).length <= maxBytes) {
+      chunk += character;
+      continue;
+    }
+    let cut = Math.max(
+      chunk.lastIndexOf("\n"),
+      chunk.lastIndexOf("。") + 1,
+      chunk.lastIndexOf("！") + 1,
+      chunk.lastIndexOf("？") + 1,
+      chunk.lastIndexOf(" ") + 1,
+    );
+    if (cut < Math.floor(chunk.length / 2)) cut = chunk.length;
+    chunks.push(chunk.slice(0, cut));
+    chunk = chunk.slice(cut) + character;
+  }
+  if (chunk) chunks.push(chunk);
+  return chunks;
+}
+
+async function translateText(text: string, sourceCode: string) {
+  if (!text.trim()) return text;
+  const safe = protect(text);
+  const translated: string[] = [];
+  for (const chunk of splitForTranslation(safe.text)) {
+    const query = new URLSearchParams({ q: chunk, langpair: `${sourceCode}|en` });
+    const response = await fetch(
+      `https://api.mymemory.translated.net/get?${query.toString()}`,
+    );
+    const result = await response.json().catch(() => null);
+    if (
+      !response.ok ||
+      result?.responseStatus !== 200 ||
+      typeof result?.responseData?.translatedText !== "string"
+    ) {
+      throw new Error(
+        result?.responseDetails ||
+          "The free translation service is unavailable or its daily quota has been reached.",
+      );
+    }
+    translated.push(result.responseData.translatedText);
+  }
+  return restore(translated.join(""), safe.values);
+}
+
 async function translate(pages: PdfPage[], source: Lang, target: Lang) {
   if (source.code === target.code) return pages;
   if (!pages.some((page) => page.text.trim() || page.fields.some((field) => field.value.trim()))) {
@@ -31,38 +102,28 @@ async function translate(pages: PdfPage[], source: Lang, target: Lang) {
       "No selectable PDF text or form values were found. This app does not use OCR.",
     );
   }
-  const url = (
-    import.meta.env.VITE_TRANSLATION_API_URL ||
-    "https://linguasheet-translation.onrender.com"
-  ).replace(/\/+$/, "");
-  let r: Response;
   try {
-    const health = await fetch(`${url}/health`);
-    if (health.ok) {
-      const status = await health.json();
-      if (Array.isArray(status.installed_languages) && !status.installed_languages.includes(source.code)) {
-        const missing = source.code === "ja" ? "Japanese" : "Filipino (Tagalog)";
-        throw new Error(
-          `The translation server is online, but its ${missing} model is not installed. Redeploy the Render service from the latest main branch so it installs the ja→en and tl→en models.`,
-        );
+    const output: PdfPage[] = [];
+    for (const page of pages) {
+      const fields = [];
+      for (const field of page.fields) {
+        fields.push({
+          ...field,
+          value: await translateText(field.value, source.code),
+        });
       }
+      output.push({
+        ...page,
+        text: await translateText(page.text, source.code),
+        fields,
+      });
     }
-    r = await fetch(`${url}/translate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pages, source: source.code, target: target.code }),
-    });
-  } catch {
-    throw new Error(
-      "Could not reach the translation service. It may be waking up; please try again in a few seconds.",
-    );
+    return output;
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("Translation failed. Please try again shortly.");
   }
-  if (!r.ok)
-    throw new Error(
-      (await r.json().catch(() => ({}))).detail ||
-        "The self-hosted translation service is unavailable.",
-    );
-  return (await r.json()).pages as PdfPage[];
 }
 function App() {
   const input = useRef<HTMLInputElement>(null);
@@ -103,7 +164,7 @@ function App() {
     }
   }
   async function doTranslate() {
-    setBusy("Translating locally…");
+    setBusy("Translating…");
     setError("");
     try {
       const result = await translate(pages, source, target);
@@ -241,11 +302,10 @@ function App() {
               </button>
             </div>
             <p className="note">
-              Local/self-hosted translation keeps the API key out of the
-              browser. The Translate button processes every page; the page list
-              only changes the preview. Selectable text and form values are
-              extracted directly without OCR. URLs, IDs, emails, phone numbers, and
-              numeric values are preserved.
+              Free-tier translation processes every page; the page list only
+              changes the preview. Selectable text and form values are extracted
+              directly without OCR. URLs, IDs, emails, phone numbers, and numeric
+              values are preserved.
             </p>
             {error && <div className="error">{error}</div>}
             {pages.length > 0 && (
